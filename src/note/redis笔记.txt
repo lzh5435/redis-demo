@@ -1,0 +1,229 @@
+redis 主从复制和哨兵实现方式
+https://segmentfault.com/a/1190000019366052
+
+1.Redis是一个非关系型【key-value格式】的缓存数据库,[NOSQL: Not Qnly SQL]
+  memcached: 菲关系型的缓存
+  mongodb:非关系型数据库
+  
+  mysql、oracle
+  
+  redis性能非常好，官方提供测试数据：50个并发执行10万个请求，读的速度是11万次/s，写的速度是8.1万次/s
+  
+  
+  Redis官网：http://www.redis.net.cn/download/
+  
+2.Redis安装：
+  1.解压Redis到指定目录[/opt/install]
+  2.yum install gcc-c++
+  3.执行make编译
+     	1) redis的家目录执行make命令（编译）
+	2) make install PREFIX=/usr/local/redis（安装）
+  4.在/etc/profile文件中配置redis的环境变量
+      export REDIS_HOME=/usr/local/redis/
+      export PATH=$PATH:$REDIS_HOME/bin
+
+   5. source /etc/profile
+	 
+	 
+3.启动Redis[redis默认的端口号为：6379]
+  1)先启动服务端，然后启动客户端
+    完成redis从后台服务进程启动【daemon】具体设置：
+	  3.1.1  vim redis.conf 将daemonize yes
+      3.1.2  cp redis.conf  /usr/local/redis/bin 目录
+	  3.1.3  ./redis-server redis.conf
+  
+  2) 客户端
+     命令行的方式：
+		 1）./redis-cli 
+			quit/exit：断开客户端和服务器端的联系
+			shutdown:在客户端关闭服务器端
+               ./redis-cli  -p 6378  shutdown
+		 
+		 2）./redis-cli  -h 192.168.23.230 -p 6378
+		 
+	 windows有一个exe可执行程序【图形化界面】：
+	 
+	 
+  
+4.默认端口：
+  redis默认的端口号为：6379
+  mysql默认的端口号为：3306
+  oracle默认的端口号为：1521
+  
+  
+  
+  
+5.Redis自带了5种数据类型：
+  Redis中存储数据是通过key-value存储的，对于value的类型有以下5种：
+    	字符串
+		哈希（hash）
+		字符串列表（list）
+		字符串集合(set)
+		有序集合（sorted set）
+
+	  
+  字符串：
+	 base64编码：可以将图片转换成字符串
+	 
+	 命令：
+	   set key value：设置某个键值对
+	   get key:根据key获取该key对应的value
+	   
+	   mset key1 value1 key2 value2 key3 value3:同时设置多个键值对
+	   mget key1 key3:可以同时获取多个键对应的值
+	   
+	  修改 getset key value1:先获取key对应的值，然后将该key对应的value值指定为value1
+	  删除： del key 
+	  
+	  数值增减[要求：key对应的value必须为数值类型]
+	    incr key1 value1:给指定的key对应的value值增加1
+		incrby key 幅度n：给指定的key对应的value值增加幅度为n的数值
+		
+		decr key1::给指定的key对应的value值减去1
+		decrby key 幅度：给指定的key对应的value值减去幅度为n的数值
+	   
+	   
+	   keys *:查看当前库中有哪些键
+	   select dbid:切换redis的库【dbid: 0 - 15】
+	   
+	   
+	 数值增加：
+	   用途：1.网站访问量统计
+	         2.生成表的id
+			 
+	 
+	哈希（hash）: 适合存储对象
+    	hset key field01 value01:  设置某个key对应的filed的值
+		hget key field01 :获取某个key对应的filed的值
+		hsetnx	key filed01 value01:当某个key对应的field不存在时，给其设置值，当key对应的field存在时，则不生效！
+		
+		hmset key field01 value01 field02 value02 field03 value03:  同时设置某个key对应的多个field的值
+		hmget key field01 :同时获取某个key对应的多个field的值
+		
+		
+		hkeys key:查看该key对应的所有的field域
+		hvals key:查看该key对应的所有的field对应的值
+		
+		
+		
+		hgetall user01:查看某个key对应的所有键值对
+
+		
+		删除：hdel key field01:删除指定key对应的某个filed
+		      del user01：删除某个key对应的所有field
+			  
+			  
+		修改：hincrby  user01 age 5： 将某个key对应的field的值按着指定幅度增加数值
+		
+        判断指定的key中的filed是否存在  语法：HEXISTS key field
+      
+	    获取key所包含的field的数量: HLEN key
+		
+		
+		
+		
+
+key的操作：
+    type key：查看某个key对应的value的类型
+	
+	ttl key: 查看某个key的剩余存活时间
+	        注意：ttl如果返回值为正数，表示key剩余的生存时间为该时间，如果为-1表示永久不过期，如果为-2表示是不存在的key!
+			
+    expire key seconds: 可以设置某个key的存活时间
+	
+	PERSIST key				清除生存时间 
+	pexpire key seconds milliseconds
+	
+	
+	keys k*:支持使用通配符的方式查看当前库【0】所有以k开头的key
+	exists key4：查看某个key是否存在，存在返回1，不存在返回0
+	
+	
+	del key: 删除某个key对应值
+	
+	
+	move key dbid:在库之间移动键值对
+	
+	dbsize: 查看当前库中key的数量
+	
+	flushdb:删除当前库的所有key
+	flushall:删除所有库的所有key
+	
+	
+	
+字符串列表（list）: 有序的，可重复的
+  lpush key 列表【value01 value02 value03】：从左边往里推送，最先放入的是value01
+  rpush key 列表【value01 value02 value03】:  从右边往里推送，最先放入的是value01
+  
+  lpop key:从最左边往外弹出数据，弹出之后数据就没了
+  rpop key:从最右边往外弹出数据，弹出之后数据就没了
+  
+ 
+  lrange key 0 -1：查看该key对应的所有的value值
+  
+  llen key:查看某个key对应的value值的个数
+  
+
+
+Set类型[无序、不可重复]
+  sadd key value01 value02:向set01对应的set集合中添加数据
+  srem key value01:删除某个key对应的set集合中的某个元素
+  
+  smembers key:查看某个key对应的所有的集合元素
+  
+  sismemeber key value01:	判断元素是否在集合中,有返回1，没有返回0
+  sinter set01 set02：取两个集合的交集
+  sunion set01 set02: 取两个集合的并集
+  sdiff set02 set01: 取出set02有而set01集合没有的元素
+  scard set01 :查看某个集合中元素的数量
+  srandmember set02: 从指定集合中随机返回一个数值
+  
+
+  
+SortedSet类型[元素不重复、但是有顺序] 
+ zadd zset01 80 zhangsan 89 lisi 34 wangwu:　 往集合中添加元素，元素可排序
+ zscore zset01 zhangsan: 查看某个集合对应的某个元素的分数
+ zrange zset01 0 -1 withscores: 查看集合中所有的元素，并且每个元素的分数也会显示出来
+ 
+ zrange zset01 0 -1: 查看集合中所有的元素
+ 
+ zrem zset01 lisi:   s删除集合中的某个元素
+  
+  
+  
+  
+  
+  
+消息订阅与发送：
+  1.客户端先订阅，服务端再发送
+  订阅命令：subscribe c1 c2：支持同时订阅多个频道
+  发布数据： 
+  
+Redis事务:
+	multi:开启事务用于标记事务的开始，其后执行的命令都将被存入命令队列，直到执行EXEC时，这些命令才被原子的执行，类似于关系型数据库的Begin Transaction
+	exec：提交事务，类似于关系型数据库的：commit
+	discard:事务回滚，类似于关系型数据库中的rollback
+
+	
+  
+  
+Redis认证：
+   config get requirepass:获取当前密码
+   config set requirepass "123456" :设置当前密码为：123456
+   auth 密码
+   输入命令
+   
+   config get dir:获取当前目录
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  

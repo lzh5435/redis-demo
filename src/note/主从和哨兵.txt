@@ -1,0 +1,24 @@
+关闭防火墙
+systemctl stop firewalld.service
+
+################主从
+主机128配置只需要放开保护模式让其他机器能连接redis,修改redis.conf:
+
+bind 0.0.0.0 -修改为如下表示允许别的ip连接,默认是本地ip才能连接
+protected-mode no - 关闭保护模式
+129和130从服务器找到redis.conf找到对应的地方修改为如下:
+
+配置主机的ip和redis端口 slaveof 192.168.64.128 6379
+主redis服务器配置了密码,则需要配置(我做的时候没配置) masterauth 123456
+然后先启动128主机的redis,再启动另外2台机器的从库redis,./redis-cli进入查看信息info可看到
+角色及从库的信息
+
+###########哨兵
+1.修改sentinel.conf配置文件 sentinel monitor mymaster 192.168.64.128 6379 1 #主节点 名称 IP 端口号 选举次数
+设置了密码的话则需配置(我的没配) sentinel auth-pass mymaster 123456
+2 修改心跳检测 5000毫秒 sentinel down-after-milliseconds mymaster 5000
+3.sentinel parallel-syncs mymaster 2 --- 做多多少合格节点
+4 如果10秒后,mysater仍没活过来，则启动failover sentinel failover-timeout mymaster
+10000
+另外做哨兵模式的时候从库的配置redis.conf也要修改,允许别的机器连接
+就是上面讲过的修改bind还有关闭保护模式.
